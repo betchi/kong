@@ -739,20 +739,58 @@ do
                               self.strategy, mig.name)
         end
 
+        if mig.name == "000_base" then
+          local res, err = self.connector:is_014()
+          if err then
+            return nil, fmt_err(self, "unable to detect database version (%s)",
+                                err)
+          end
+
+          if not res.is_eq_014 and not res.is_gt_014 then
+            if res.missing_migration then
+              return nil, fmt_err(self,
+                                  "Migration to 1.0 can only be executed " ..
+                                  "from a fresh or 0.14.x %s %s, but the " ..
+                                  "%s %s is missing some migrations (%s) " ..
+                                  "for %s component, indicating an older " ..
+                                  "version. Migrate to 0.14.x first.",
+                                  self.strategy, self.infos.db_desc,
+                                  self.strategy, self.infos.db_desc,
+                                  res.missing_migration, res.missing_component)
+
+            elseif res.missing_component then
+              return nil, fmt_err(self,
+                                  "Migration to 1.0 can only be executed "   ..
+                                  "from a fresh or 0.14.x %s %s, but the "   ..
+                                  "%s %s is missing migrations for %s "      ..
+                                  "component, indicating an older version. " ..
+                                  "Migrate to 0.14.x first.",
+                                  self.strategy, self.infos.db_desc,
+                                  self.strategy, self.infos.db_desc,
+                                  res.missing_component)
+            end
+
+            return nil, fmt_err(self,
+                                "Migration to 1.0 can only be executed " ..
+                                "from a fresh or 0.14.x %s %s, but the " ..
+                                "%s %s is missing migrations. Migrate "  ..
+                                "to 0.14.x first.",
+                                self.strategy, self.infos.db_desc,
+                                self.strategy, self.infos.db_desc)
+          end
+        end
+
         log.debug("running migration: %s", mig.name)
 
         if run_up then
           -- kong migrations bootstrap
           -- kong migrations up
-
-          local ok, err = self.connector:run_up_migration(mig.name,
-                                                          strategy_migration.up)
+          ok, err = self.connector:run_up_migration(mig.name, strategy_migration.up)
           if not ok then
             self.connector:close()
             return nil, fmt_err(self, "failed to run migration '%s' up: %s",
                                 mig.name, err)
           end
-
 
           local state = "executed"
           if strategy_migration.teardown then
@@ -761,8 +799,7 @@ do
             n_pending = n_pending + 1
           end
 
-          local ok, err = self.connector:record_migration(t.subsystem,
-                                                          mig.name, state)
+          ok, err = self.connector:record_migration(t.subsystem, mig.name, state)
           if not ok then
             self.connector:close()
             return nil, fmt_err(self, "failed to record migration '%s': %s",
@@ -780,11 +817,9 @@ do
             self.connector:close()
             return nil, fmt_err(self, "failed to run migration '%s' teardown: %s",
                                 mig.name, perr or err)
-
           end
 
-          local ok, err = self.connector:record_migration(t.subsystem,
-                                                          mig.name, "teardown")
+          ok, err = self.connector:record_migration(t.subsystem, mig.name, "teardown")
           if not ok then
             self.connector:close()
             return nil, fmt_err(self, "failed to record migration '%s': %s",

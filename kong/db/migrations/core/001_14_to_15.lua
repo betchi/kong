@@ -118,6 +118,8 @@ return {
           assert(connector:query(sql))
         end
       end
+
+      assert(connector:query('DROP TABLE IF EXISTS "schema_migrations" CASCADE;'))
     end,
   },
 
@@ -260,6 +262,7 @@ return {
       }))
 
       assert(connector:query("DROP TABLE IF EXISTS plugins_temp"))
+      assert(connector:query("DROP TABLE IF EXISTS schema_migrations"))
     end,
   },
 }
