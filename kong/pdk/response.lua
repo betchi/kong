@@ -47,6 +47,14 @@ local rewrite_access_header = phase_checker.new(PHASES.rewrite,
                                                 PHASES.header_filter)
 
 
+local log_messages = {
+  [500] = "Internal Server Error",
+  [501] = "Not Implemented",
+  [502] = "Bad Gateway",
+  [503] = "Service Unavailable",
+}
+
+
 local function new(self, major_version)
   local _RESPONSE = {}
 
@@ -572,6 +580,15 @@ local function new(self, major_version)
 
     if headers ~= nil then
       validate_headers(headers)
+    end
+
+    if status >= 500 then
+      local msg = (type(body) == "table" and body.message)
+                  or (type(body) == "string" and body)
+                  or log_messages[status]
+      if msg then
+        self.log.err(msg)
+      end
     end
 
     local ctx = ngx.ctx
